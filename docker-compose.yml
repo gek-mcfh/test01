@@ -1,0 +1,41 @@
+version: "3.7"
+
+services:
+  fbk_app:
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+    build: ./deployment
+    image: fbk_app:1.0
+    container_name: fbk_app
+    volumes:
+      - .:/code
+      - ./fbk/service/prod.nginx.conf:/etc/nginx/conf.d/fbk.conf:ro
+    depends_on:
+      - fbk_db
+    command: >
+      sh -c  "python /code/manage.py wait_for_db && service nginx start && gunicorn --bind 0.0.0.0:8080 fbk.wsgi"
+    networks:
+      fbk_net:
+        ipv4_address: 10.0.10.3
+    ports:
+      - 8080:80
+  fbk_db:
+    image: postgres:11
+    restart: always
+    container_name: fbk_db
+    networks:
+      fbk_net:
+        ipv4_address: 10.0.10.2
+    volumes:
+      - ./deployment/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - TZ=Europe/Moscow
+      - POSTGRES_PASSWORD=12345678
+
+networks:
+  fbk_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: "10.0.10.0/28"
